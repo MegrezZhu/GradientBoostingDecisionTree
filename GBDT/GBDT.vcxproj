@@ -20,10 +20,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\lib\GBDT.h" />
+    <ClInclude Include="src\lib\logger.h" />
     <ClInclude Include="src\lib\util.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\lib\GBDT.cpp" />
+    <ClCompile Include="src\lib\logger.cpp" />
     <ClCompile Include="src\lib\util.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>

@@ -28,6 +28,7 @@ namespace zyuco {
 
 	class RegressionTree {
 		typedef std::vector<size_t> Index;
+		typedef std::vector<Index> IndexMap;
 	protected:
 		struct SplitPoint {
 			size_t featureIndex;
@@ -46,9 +47,9 @@ namespace zyuco {
 
 		double predict(const Data::DataRow &r) const;
 
-		static SplitPoint findSplitPoint(const Data::DataFrame &x, const Data::DataColumn &y, const Index &index);
+		static SplitPoint findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index);
 		static double calculateError(size_t len, double sum, double powSum);
-		static std::unique_ptr<RegressionTree> createNode(const Data::DataFrame &x, const Data::DataColumn &y, const Index &index, int maxDepth);
+		static std::unique_ptr<RegressionTree> createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, int maxDepth);
 	public:
 		Data::DataColumn predict(const Data::DataFrame &x) const;
 

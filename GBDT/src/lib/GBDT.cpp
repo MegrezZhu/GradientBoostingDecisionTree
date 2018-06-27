@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "GBDT.h"
+#include "logger.h"
 
 using namespace std;
 
@@ -15,18 +16,18 @@ namespace zyuco {
 		else return right->predict(r);
 	}
 
-	RegressionTree::SplitPoint RegressionTree::findSplitPoint(const Data::DataFrame &x, const Data::DataColumn &y, const Index &index) {
+	RegressionTree::SplitPoint RegressionTree::findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index) {
 		double bestGain = 0, bestSplit = 0;
 		size_t bestFeature = 0;
 
 		// TODO: parallel
-		for (size_t featureIndex = 0; featureIndex < x.front().size(); featureIndex++) {
+		for (size_t featureIndex = 0; featureIndex < xx.size(); featureIndex++) {
 			vector<pair<size_t, double>> v(index.size());
 
 			for (size_t i = 0; i < index.size(); i++) {
 				auto ind = index[i];
 				v[i].first = ind;
-				v[i].second = x[ind][featureIndex];
+				v[i].second = xx[featureIndex][ind];
 			}
 
 			tuple<size_t, double, double> tup;
@@ -71,12 +72,12 @@ namespace zyuco {
 		}
 
 		if (bestGain > 0.) {
-			cout << "best gain: " << bestGain << endl;
-			cout << "split at: " << bestSplit << endl;
-			cout << "on feature " << bestFeature << endl << endl;
+			logger << "best gain: " << bestGain << '\n';
+			logger << "split at: " << bestSplit << '\n';
+			logger << "on feature " << bestFeature << '\n' << '\n';
 		}
 
-		return { bestFeature,bestSplit,bestGain };
+		return { bestFeature, bestSplit, bestGain };
 	}
 
 	double RegressionTree::calculateError(size_t len, double sum, double powSum) {
@@ -87,7 +88,7 @@ namespace zyuco {
 		return a + b - c;
 	}
 
-	std::unique_ptr<RegressionTree> RegressionTree::createNode(const Data::DataFrame &x, const Data::DataColumn &y, const Index &index, int maxDepth) {
+	std::unique_ptr<RegressionTree> RegressionTree::createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, int maxDepth) {
 		// depth-first growing
 
 		if (maxDepth <= 0) return unique_ptr<RegressionTree>();
@@ -95,19 +96,19 @@ namespace zyuco {
 		auto p = new RegressionTree();
 
 		// calculate value for prediction
-		p->average = 0;
+		p->average = 0.;
 		for (auto ind : index) p->average += y[ind];
 		p->average /= index.size();
 
-		if (x.size() > 1) {
+		if (index.size() > 1) {
 			// try to split
-			auto ret = findSplitPoint(x, y, index);
+			auto ret = findSplitPoint(xx, y, index);
 			if (ret.gain > 0 && maxDepth > 1) { // check splitablity
 				// split points
 				p->isLeaf = false;
 				vector<size_t> leftIndex, rightIndex;
 				for (auto ind : index) {
-					if (x[ind][ret.featureIndex] <= ret.splitPoint) {
+					if (xx[ret.featureIndex][ind] <= ret.splitPoint) {
 						leftIndex.push_back(ind); // to the left
 					}
 					else {
@@ -118,8 +119,8 @@ namespace zyuco {
 				p->featureIndex = ret.featureIndex;
 				p->featureValue = ret.splitPoint;
 
-				p->left = createNode(x, y, leftIndex, maxDepth - 1);
-				p->right = createNode(x, y, rightIndex, maxDepth - 1);
+				p->left = createNode(xx, y, leftIndex, maxDepth - 1);
+				p->right = createNode(xx, y, rightIndex, maxDepth - 1);
 			}
 		}
 
@@ -133,12 +134,23 @@ namespace zyuco {
 		return result;
 	}
 
-	std::unique_ptr<RegressionTree> RegressionTree::fit(const Data::DataFrame &x, const Data::DataColumn &y, int maxDepth) {
-		if (x.size() != y.size()) throw invalid_argument("x, y has different size");
-		if (x.empty() || y.empty()) throw invalid_argument("empty dataset");
-		vector<size_t> index(y.size());
-		for (size_t i = 0; i < y.size(); i++) index[i] = i;
-		return createNode(x, y, index, maxDepth);
+	std::unique_ptr<RegressionTree> RegressionTree::fit(const Data::DataFrame &xx, const Data::DataColumn &y, int maxDepth) {
+		//// initializing indexMap
+		//IndexMap indexMap(x.front().size(), Index(x.size())); // size: nFeature * nSample
+		//for (size_t i = 0; i < y.size(); i++) {
+		//	for (auto &index : indexMap) index[i] = i;
+		//}
+
+		//// pre-sorting
+		//for (size_t featureIndex = 0; featureIndex < x.front().size(); featureIndex++) {
+		//	sort(indexMap[featureIndex].begin(), indexMap[featureIndex].end(), [](const auto &a, const auto &b) {
+		//		return xx[featureIndex][a] < xx[featureIndex][b];
+		//	});
+		//}
+		Index index(xx.front().size());
+		for (size_t i = 0; i < index.size(); i++) index[i] = i;
+
+		return createNode(xx, y, index, maxDepth);
 	}
 
 	Data::DataColumn GradientBoostingClassifer::predict(const Data::DataFrame & x) const {
@@ -153,10 +165,21 @@ namespace zyuco {
 	std::unique_ptr<GradientBoostingClassifer> GradientBoostingClassifer::fit(const Data::DataFrame & x, const Data::DataColumn & y, size_t maxDepth, size_t iters) {
 		auto p = new GradientBoostingClassifer();
 
+		if (x.size() != y.size()) throw invalid_argument("x, y has different size");
+		if (x.empty() || y.empty()) throw invalid_argument("empty dataset");
+
+		// reshaping input x into a column-first nFeature * nSample matrix
+		// for better cache performance
+		Data::DataFrame xx(x.front().size(), Data::DataRow(x.size()));
+		for (size_t i = 0; i < x.size(); i++) {
+			const auto &row = x[i];
+			for (size_t j = 0; j < row.size(); j++) xx[j][i] = row[j];
+		}
+
 		double eta = 1.;
 		auto residual = y;
 		while (iters--) {
-			auto subtree = RegressionTree::fit(x, residual, maxDepth);
+			auto subtree = RegressionTree::fit(xx, residual, maxDepth);
 
 			auto pred = subtree->predict(x);
 			pred *= eta;

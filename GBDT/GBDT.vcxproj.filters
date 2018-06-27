@@ -36,12 +36,18 @@
     <ClCompile Include="src\lib\util.cpp">
       <Filter>源文件\src\lib</Filter>
     </ClCompile>
+    <ClCompile Include="src\lib\logger.cpp">
+      <Filter>源文件\src\lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\lib\util.h">
       <Filter>头文件\src\lib</Filter>
     </ClInclude>
     <ClInclude Include="src\lib\GBDT.h">
+      <Filter>头文件\src\lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lib\logger.h">
       <Filter>头文件\src\lib</Filter>
     </ClInclude>
   </ItemGroup>

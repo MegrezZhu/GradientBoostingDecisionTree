@@ -5,6 +5,7 @@
 #include <chrono>
 
 #include "util.h"
+#include "logger.h"
 
 #include <iostream>
 
@@ -13,7 +14,6 @@ using namespace std;
 namespace zyuco {
 	namespace Data {
 		TrainData fromLibSVM(const std::string & path, int featureCount) {
-			auto start = getCurrentMillisecond();
 			DataFrame x;
 			DataColumn y;
 
@@ -28,7 +28,7 @@ namespace zyuco {
 				y.push_back(item.second);
 			}
 
-			std::cout << "finished in " << (getCurrentMillisecond() - start) << " ms." << endl;
+			logger << NOW << "read done\n";
 			return { move(x), move(y) };
 		}
 
