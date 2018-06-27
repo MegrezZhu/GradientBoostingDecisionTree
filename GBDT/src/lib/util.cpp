@@ -4,6 +4,7 @@
 #include <sstream>
 #include <chrono>
 #include <iostream>
+#include <random>
 #include <omp.h>
 
 #include "util.h"
@@ -45,7 +46,7 @@ namespace zyuco {
 			// shuffle
 			vector<size_t> indices(total);
 			for (size_t i = 0; i < total; i++) indices[i] = i;
-			random_shuffle(indices.begin(), indices.end());
+			shuffle(indices.begin(), indices.end(), mt19937(random_device()()));
 
 			DataFrame trainX, testX;
 			DataColumn trainY, testY;

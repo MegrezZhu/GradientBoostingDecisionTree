@@ -51,6 +51,10 @@ namespace zyuco {
 		static SplitPoint findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index);
 		static double calculateError(size_t len, double sum, double powSum);
 		static std::unique_ptr<RegressionTree> createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const BoostingConfig &config, size_t leftDepth);
+
+		// s: #random-samples, q: #bins
+		static std::vector<double> sampleBinsDivider(const std::vector<double> &v, size_t s, size_t q);
+		static size_t decideWhichBin(const std::vector<double> &divider, double value);
 	public:
 		Data::DataColumn predict(const Data::DataFrame &x) const;
 

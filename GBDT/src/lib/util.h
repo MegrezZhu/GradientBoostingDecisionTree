@@ -20,7 +20,6 @@ namespace zyuco {
 		TrainData fromLibSVM(const std::string &path, int featureCount);
 		SplitXYResult splitXY(DataFrame &&x, DataColumn &&y, double trainSize = 0.8);
 		std::pair<DataRow, double> parseLibSVMLine(const std::string &line, int featureCount);
-
 	}
 
 	long long getCurrentMillisecond();

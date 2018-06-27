@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <omp.h>
 #include <iostream>
+#include <random>
 
 #include "GBDT.h"
 #include "logger.h"
@@ -20,57 +21,62 @@ namespace zyuco {
 	RegressionTree::SplitPoint RegressionTree::findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index) {
 		double bestGain = 0, bestSplit = 0;
 		size_t bestFeature = 0;
+		size_t num = index.size();
 
 		// TODO: parallel
 		#pragma omp parallel for
 		for (int i = 0; i < xx.size(); i++) {
 			size_t featureIndex = i;
-			vector<pair<size_t, double>> v(index.size());
 
+			vector<double> featureValues(num);
 			for (size_t i = 0; i < index.size(); i++) {
-				auto ind = index[i];
-				v[i].first = ind;
-				v[i].second = xx[featureIndex][ind];
+				featureValues[i] = xx[featureIndex][index[i]]; // for cache
 			}
-
-			tuple<size_t, double, double> tup;
-			// TODO: use index map & pre-sorting instead
-			sort(v.begin(), v.end(), [](const auto &l, const auto &r) {
-				return l.second < r.second;
-			});
+			size_t nSample = pow(num, .5), nBin = pow(num, .25);
+			auto dividers = sampleBinsDivider(featureValues, nSample, nBin);
+			vector<double> binSums(nBin, .0), binPowSums(nBin, .0);
+			vector<size_t> binSizes(nBin, 0);
+			for (size_t i = 0; i < num; i++) {
+				auto into = decideWhichBin(dividers, featureValues[i]);
+				auto label = y[index[i]];
+				binSums[into] += label;
+				binPowSums[into] += pow(label, 2);
+				binSizes[into]++;
+			}
 
 			double wholeErr, leftErr, rightErr;
 			double wholeSum = 0, leftSum, rightSum;
 			double wholePowSum = 0, leftPowSum, rightPowSum;
-			for (const auto &t : v) {
-				wholeSum += y[t.first];
-				wholePowSum += pow(y[t.first], 2);
-			}
-			wholeErr = calculateError(index.size(), wholeSum, wholePowSum);
+			size_t leftSize = 0, rightSize = num;
+			for (auto t : binSums) wholeSum += t;
+			for (auto t : binPowSums) wholePowSum += t;
+			wholeErr = calculateError(num, wholeSum, wholePowSum);
 
 			leftSum = leftPowSum = 0;
 			rightSum = wholeSum;
 			rightPowSum = wholePowSum;
-			for (size_t i = 0; i + 1 < index.size(); i++) {
-				auto label = y[v[i].first];
+			for (size_t i = 0; i + 1 < binSums.size(); i++) {
+				auto divider = dividers[i];
+				auto binSum = binSums[i];
+				auto binPowSum = binPowSums[i];
+				auto binSize = binSizes[i];
 
-				leftSum += label;
-				rightSum -= label;
-				leftPowSum += pow(label, 2);
-				rightPowSum -= pow(label, 2);
+				leftSum += binSum;
+				rightSum -= binSum;
+				leftPowSum += binPowSum;
+				rightPowSum -= binPowSum;
+				leftSize += binSize;
+				rightSize -= binSize;
 
-				if (y[v[i].first] == y[v[i + 1].first]) continue; // same label with next, not splitable
-				if (v[i].second == v[i + 1].second) continue; // same value, not splitable
+				leftErr = calculateError(leftSize, leftSum, leftPowSum);
+				rightErr = calculateError(rightSize, rightSum, rightPowSum);
 
-				leftErr = calculateError(i + 1, leftSum, leftPowSum);
-				rightErr = calculateError(index.size() - i - 1, rightSum, rightPowSum);
-
-				double gain = wholeErr - ((i + 1) * leftErr / index.size() + (index.size() - i - 1) * rightErr / index.size());
+				double gain = wholeErr - (leftSize * leftErr / num + rightSize * rightErr / num);
 
 				#pragma omp critical
 				if (gain > bestGain) {
 					bestGain = gain;
-					bestSplit = (v[i].second + v[i + 1].second) / 2;
+					bestSplit = divider;
 					bestFeature = featureIndex;
 				}
 			}
@@ -104,7 +110,6 @@ namespace zyuco {
 			auto ret = findSplitPoint(xx, y, index);
 			if (ret.gain > config.gamma && leftDepth > 1) { // check splitablity
 				// split points
-				p->isLeaf = false;
 				vector<size_t> leftIndex, rightIndex;
 				for (auto ind : index) {
 					if (xx[ret.featureIndex][ind] <= ret.splitPoint) {
@@ -114,18 +119,62 @@ namespace zyuco {
 						rightIndex.push_back(ind); // to the right
 					}
 				}
-				if (leftIndex.size() == 0 || rightIndex.size() == 0) throw runtime_error("unexpected empty subtree");
-				p->featureIndex = ret.featureIndex;
-				p->featureValue = ret.splitPoint;
+				// if (leftIndex.size() == 0 || rightIndex.size() == 0) throw runtime_error("unexpected empty subtree");
+				if (leftIndex.size() != 0 && rightIndex.size() != 0) {
+					p->isLeaf = false;
 
-				p->left = createNode(xx, y, leftIndex, config, leftDepth - 1);
-				p->right = createNode(xx, y, rightIndex, config, leftDepth - 1);
+					p->featureIndex = ret.featureIndex;
+					p->featureValue = ret.splitPoint;
 
-				cout << NOW << "node split at feature " << ret.featureIndex << " with gain " << ret.gain << '\n';
+					p->left = createNode(xx, y, leftIndex, config, leftDepth - 1);
+					p->right = createNode(xx, y, rightIndex, config, leftDepth - 1);
+
+					cout << NOW << "node split at feature " << ret.featureIndex << " with gain " << ret.gain << '\n';
+				}
 			}
 		}
 
 		return unique_ptr<RegressionTree>(p);
+	}
+
+	std::vector<double> RegressionTree::sampleBinsDivider(const std::vector<double>& v, size_t s, size_t q) {
+		vector<double> samples(s);
+		std::random_device rd;
+		auto gen = std::default_random_engine(rd());
+		std::uniform_int_distribution<int> dis(0, v.size() - 1);
+		for (size_t i = 0; i < s; i++) samples[i] = v[dis(gen)];
+
+		sort(samples.begin(), samples.end());
+
+		vector<double> divider(q - 1);
+		size_t space = (samples.size() - (q - 1)) / q;
+		for (size_t i = 0; i < q - 1; i++) {
+			divider[i] = samples[(space + 1) * i];
+		}
+		return divider;
+	}
+
+	size_t RegressionTree::decideWhichBin(const std::vector<double>& divider, double value) {
+		// linear search significantly outperforms binary search, why?
+		// due to the mostly zeros?
+
+		//int l = 0, r = divider.size() - 1;
+		//size_t result = r + 1;
+		//while (l <= r) {
+		//	size_t m = (l + r) / 2;
+		//	if (value <= divider[m]) {
+		//		result = m;
+		//		r = m - 1;
+		//	}
+		//	else {
+		//		l = m + 1;
+		//	}
+		//}
+		//return result;
+		for (size_t i = 0; i < divider.size(); i++) {
+			if (value <= divider[i]) return i;
+		}
+		return divider.size();
 	}
 
 	Data::DataColumn RegressionTree::predict(const Data::DataFrame & x) const {

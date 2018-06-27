@@ -13,6 +13,7 @@ namespace zyuco {
 
 	std::ostream& operator<<(std::ostream& out, TimeIndicator) {
 		out << getTime() << " - ";
+		return out;
 	}
 }
 
