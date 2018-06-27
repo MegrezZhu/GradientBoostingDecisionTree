@@ -3,11 +3,11 @@
 #include <cctype>
 #include <sstream>
 #include <chrono>
+#include <iostream>
+#include <omp.h>
 
 #include "util.h"
 #include "logger.h"
-
-#include <iostream>
 
 using namespace std;
 
@@ -21,14 +21,20 @@ namespace zyuco {
 			getline(ifstream(path), content, '\0');
 			stringstream in(move(content));
 
+			vector<string> lines;
 			string line;
-			while (getline(in, line)) {
-				auto item = parseLibSVMLine(line, featureCount);
-				x.push_back(item.first);
-				y.push_back(item.second);
+			while (getline(in, line)) lines.push_back(move(line));
+
+			#pragma omp parallel for
+			for (int i = 0; i < lines.size(); i++) {
+				auto item = parseLibSVMLine(move(lines[i]), featureCount);
+				#pragma omp critical
+				{
+					x.push_back(item.first);
+					y.push_back(item.second);
+				}
 			}
 
-			logger << NOW << "read done\n";
 			return { move(x), move(y) };
 		}
 

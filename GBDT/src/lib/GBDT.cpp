@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <omp.h>
 #include <iostream>
 
 #include "GBDT.h"
@@ -21,7 +22,9 @@ namespace zyuco {
 		size_t bestFeature = 0;
 
 		// TODO: parallel
-		for (size_t featureIndex = 0; featureIndex < xx.size(); featureIndex++) {
+		#pragma omp parallel for
+		for (int i = 0; i < xx.size(); i++) {
+			size_t featureIndex = i;
 			vector<pair<size_t, double>> v(index.size());
 
 			for (size_t i = 0; i < index.size(); i++) {
@@ -63,18 +66,14 @@ namespace zyuco {
 				rightErr = calculateError(index.size() - i - 1, rightSum, rightPowSum);
 
 				double gain = wholeErr - ((i + 1) * leftErr / index.size() + (index.size() - i - 1) * rightErr / index.size());
+
+				#pragma omp critical
 				if (gain > bestGain) {
 					bestGain = gain;
 					bestSplit = (v[i].second + v[i + 1].second) / 2;
 					bestFeature = featureIndex;
 				}
 			}
-		}
-
-		if (bestGain > 0.) {
-			logger << "best gain: " << bestGain << '\n';
-			logger << "split at: " << bestSplit << '\n';
-			logger << "on feature " << bestFeature << '\n' << '\n';
 		}
 
 		return { bestFeature, bestSplit, bestGain };
@@ -88,10 +87,10 @@ namespace zyuco {
 		return a + b - c;
 	}
 
-	std::unique_ptr<RegressionTree> RegressionTree::createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, int maxDepth) {
+	std::unique_ptr<RegressionTree> RegressionTree::createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const BoostingConfig &config, size_t leftDepth) {
 		// depth-first growing
 
-		if (maxDepth <= 0) return unique_ptr<RegressionTree>();
+		if (leftDepth <= 0) return unique_ptr<RegressionTree>();
 
 		auto p = new RegressionTree();
 
@@ -100,10 +99,10 @@ namespace zyuco {
 		for (auto ind : index) p->average += y[ind];
 		p->average /= index.size();
 
-		if (index.size() > 1) {
+		if (index.size() > max<size_t>(1, config.minChildWeight)) {
 			// try to split
 			auto ret = findSplitPoint(xx, y, index);
-			if (ret.gain > 0 && maxDepth > 1) { // check splitablity
+			if (ret.gain > config.gamma && leftDepth > 1) { // check splitablity
 				// split points
 				p->isLeaf = false;
 				vector<size_t> leftIndex, rightIndex;
@@ -119,8 +118,10 @@ namespace zyuco {
 				p->featureIndex = ret.featureIndex;
 				p->featureValue = ret.splitPoint;
 
-				p->left = createNode(xx, y, leftIndex, maxDepth - 1);
-				p->right = createNode(xx, y, rightIndex, maxDepth - 1);
+				p->left = createNode(xx, y, leftIndex, config, leftDepth - 1);
+				p->right = createNode(xx, y, rightIndex, config, leftDepth - 1);
+
+				cout << NOW << "node split at feature " << ret.featureIndex << " with gain " << ret.gain << '\n';
 			}
 		}
 
@@ -128,13 +129,15 @@ namespace zyuco {
 	}
 
 	Data::DataColumn RegressionTree::predict(const Data::DataFrame & x) const {
-		Data::DataColumn result;
-		result.reserve(x.size());
-		for (const auto &r : x) result.push_back(predict(r));
+		Data::DataColumn result(x.size());
+		#pragma omp parallel for
+		for (int i = 0; i < x.size(); i++) {
+			result[i] = predict(x[i]);
+		}
 		return result;
 	}
 
-	std::unique_ptr<RegressionTree> RegressionTree::fit(const Data::DataFrame &xx, const Data::DataColumn &y, int maxDepth) {
+	std::unique_ptr<RegressionTree> RegressionTree::fit(const Data::DataFrame &xx, const Data::DataColumn &y, const BoostingConfig &config) {
 		//// initializing indexMap
 		//IndexMap indexMap(x.front().size(), Index(x.size())); // size: nFeature * nSample
 		//for (size_t i = 0; i < y.size(); i++) {
@@ -150,23 +153,26 @@ namespace zyuco {
 		Index index(xx.front().size());
 		for (size_t i = 0; i < index.size(); i++) index[i] = i;
 
-		return createNode(xx, y, index, maxDepth);
+		return createNode(xx, y, index, config, config.maxDepth);
 	}
 
 	Data::DataColumn GradientBoostingClassifer::predict(const Data::DataFrame & x) const {
 		Data::DataColumn result(x.size(), 0.);
 		for (const auto& ptr : trees) {
 			auto subResult = ptr->predict(x);
+			subResult *= config.eta;
 			result += subResult; // better cache performance ?
 		}
 		return result;
 	}
 
-	std::unique_ptr<GradientBoostingClassifer> GradientBoostingClassifer::fit(const Data::DataFrame & x, const Data::DataColumn & y, size_t maxDepth, size_t iters) {
+	std::unique_ptr<GradientBoostingClassifer> GradientBoostingClassifer::fit(const Data::DataFrame & x, const Data::DataColumn & y, const BoostingConfig &config) {
 		auto p = new GradientBoostingClassifer();
 
 		if (x.size() != y.size()) throw invalid_argument("x, y has different size");
 		if (x.empty() || y.empty()) throw invalid_argument("empty dataset");
+
+		p->config = config;
 
 		// reshaping input x into a column-first nFeature * nSample matrix
 		// for better cache performance
@@ -176,16 +182,17 @@ namespace zyuco {
 			for (size_t j = 0; j < row.size(); j++) xx[j][i] = row[j];
 		}
 
-		double eta = 1.;
 		auto residual = y;
-		while (iters--) {
-			auto subtree = RegressionTree::fit(xx, residual, maxDepth);
+		auto roundsLeft = config.rounds;
+		while (roundsLeft--) {
+			auto subtree = RegressionTree::fit(xx, residual, config);
 
 			auto pred = subtree->predict(x);
-			pred *= eta;
+			pred *= config.eta;
 			residual -= pred;
 
 			p->trees.push_back(move(subtree));
+			cout << NOW << config.rounds - roundsLeft << "th round finished\n";
 		}
 
 		return unique_ptr<GradientBoostingClassifer>(p);

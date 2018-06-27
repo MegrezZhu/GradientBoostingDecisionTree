@@ -7,23 +7,24 @@
 #include "util.h"
 
 namespace zyuco {
+	struct BoostingConfig {
+		double eta = 1.;				// shrinkage rate
+		double gamma = 0.;				// minimum gain required to split a node
+		size_t maxDepth = 6;			// max depth allowed
+		size_t minChildWeight = 1;		// minimum allowed size for a node to be splitted
+		size_t rounds = 1;				// number of subtrees
+	};
+
 	class RegressionTree;
 
 	class GradientBoostingClassifer {
-        struct Config {
-            double eta;
-			size_t maxDepth;
-			// below are not supported yet
-			double minChildWeight;
-			double minimumGain;
-        };
-
+		BoostingConfig config;
 		std::vector<std::unique_ptr<RegressionTree>> trees;
-
 	public:
+
 		Data::DataColumn predict(const Data::DataFrame &x) const;
 
-		static std::unique_ptr<GradientBoostingClassifer> fit(const Data::DataFrame &x, const Data::DataColumn &y, size_t maxDepth, size_t iters);
+		static std::unique_ptr<GradientBoostingClassifer> fit(const Data::DataFrame &x, const Data::DataColumn &y, const BoostingConfig &config);
 	};
 
 	class RegressionTree {
@@ -49,10 +50,10 @@ namespace zyuco {
 
 		static SplitPoint findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index);
 		static double calculateError(size_t len, double sum, double powSum);
-		static std::unique_ptr<RegressionTree> createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, int maxDepth);
+		static std::unique_ptr<RegressionTree> createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const BoostingConfig &config, size_t leftDepth);
 	public:
 		Data::DataColumn predict(const Data::DataFrame &x) const;
 
-		static std::unique_ptr<RegressionTree> fit(const Data::DataFrame &x, const Data::DataColumn &y, int maxDepth);
+		static std::unique_ptr<RegressionTree> fit(const Data::DataFrame &x, const Data::DataColumn &y, const BoostingConfig &config);
 	};
 }
