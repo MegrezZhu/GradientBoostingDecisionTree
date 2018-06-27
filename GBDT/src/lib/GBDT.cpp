@@ -21,25 +21,26 @@ namespace zyuco {
 
 		// TODO: parallel
 		for (size_t featureIndex = 0; featureIndex < x.front().size(); featureIndex++) {
-			vector<tuple<size_t, double, double>> v;
-			v.reserve(index.size());
+			vector<pair<size_t, double>> v(index.size());
 
-			for (auto ind : index) {
-				v.push_back({ ind, x[ind][featureIndex], y[ind] });
+			for (size_t i = 0; i < index.size(); i++) {
+				auto ind = index[i];
+				v[i].first = ind;
+				v[i].second = x[ind][featureIndex];
 			}
 
 			tuple<size_t, double, double> tup;
 			// TODO: use index map & pre-sorting instead
 			sort(v.begin(), v.end(), [](const auto &l, const auto &r) {
-				return get<1>(l) < get<1>(r);
+				return l.second < r.second;
 			});
 
 			double wholeErr, leftErr, rightErr;
 			double wholeSum = 0, leftSum, rightSum;
 			double wholePowSum = 0, leftPowSum, rightPowSum;
 			for (const auto &t : v) {
-				wholeSum += get<2>(t);
-				wholePowSum += pow(get<2>(t), 2);
+				wholeSum += y[t.first];
+				wholePowSum += pow(y[t.first], 2);
 			}
 			wholeErr = calculateError(index.size(), wholeSum, wholePowSum);
 
@@ -47,15 +48,15 @@ namespace zyuco {
 			rightSum = wholeSum;
 			rightPowSum = wholePowSum;
 			for (size_t i = 0; i + 1 < index.size(); i++) {
-				auto label = get<2>(v[i]);
+				auto label = y[v[i].first];
 
 				leftSum += label;
 				rightSum -= label;
 				leftPowSum += pow(label, 2);
 				rightPowSum -= pow(label, 2);
 
-				if (get<2>(v[i]) == get<2>(v[i + 1])) continue; // same label with next, not splitable
-				if (get<1>(v[i]) == get<1>(v[i + 1])) continue; // same value, not splitable
+				if (y[v[i].first] == y[v[i + 1].first]) continue; // same label with next, not splitable
+				if (v[i].second == v[i + 1].second) continue; // same value, not splitable
 
 				leftErr = calculateError(i + 1, leftSum, leftPowSum);
 				rightErr = calculateError(index.size() - i - 1, rightSum, rightPowSum);
@@ -63,7 +64,7 @@ namespace zyuco {
 				double gain = wholeErr - ((i + 1) * leftErr / index.size() + (index.size() - i - 1) * rightErr / index.size());
 				if (gain > bestGain) {
 					bestGain = gain;
-					bestSplit = (get<1>(v[i]) + get<1>(v[i + 1])) / 2;
+					bestSplit = (v[i].second + v[i + 1].second) / 2;
 					bestFeature = featureIndex;
 				}
 			}
