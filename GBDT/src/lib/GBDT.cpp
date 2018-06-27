@@ -187,18 +187,6 @@ namespace zyuco {
 	}
 
 	std::unique_ptr<RegressionTree> RegressionTree::fit(const Data::DataFrame &xx, const Data::DataColumn &y, const BoostingConfig &config) {
-		//// initializing indexMap
-		//IndexMap indexMap(x.front().size(), Index(x.size())); // size: nFeature * nSample
-		//for (size_t i = 0; i < y.size(); i++) {
-		//	for (auto &index : indexMap) index[i] = i;
-		//}
-
-		//// pre-sorting
-		//for (size_t featureIndex = 0; featureIndex < x.front().size(); featureIndex++) {
-		//	sort(indexMap[featureIndex].begin(), indexMap[featureIndex].end(), [](const auto &a, const auto &b) {
-		//		return xx[featureIndex][a] < xx[featureIndex][b];
-		//	});
-		//}
 		Index index(xx.front().size());
 		for (size_t i = 0; i < index.size(); i++) index[i] = i;
 
@@ -242,6 +230,10 @@ namespace zyuco {
 
 			p->trees.push_back(move(subtree));
 			cout << NOW << config.rounds - roundsLeft << "th round finished\n";
+
+			auto totalPred = y;
+			totalPred -= residual;
+			cout << NOW << "training accuracy: " << calculateAccuracy(totalPred, y) << ", training auc: " << calculateAUC(totalPred, y) << endl;
 		}
 
 		return unique_ptr<GradientBoostingClassifer>(p);

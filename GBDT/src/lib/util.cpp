@@ -107,6 +107,37 @@ namespace zyuco {
 		return double(correct) / predict.size();
 	}
 
+	double calculateAUC(const Data::DataColumn & predict, const Data::DataColumn & truth) {
+		if (predict.size() != truth.size()) throw invalid_argument("size not matched");
+
+		vector<pair<double, double>> d(predict.size(), { .0, .0 });
+		for (size_t i = 0; i < d.size(); i++) {
+			d[i].first = predict[i];
+			d[i].second = truth[i];
+		}
+		sort(d.begin(), d.end(), [](const auto &a, const auto &b) {
+			return a.first > b.first;
+		});
+
+		size_t nPos = 0, nNeg = 0;
+		for (auto v : truth) {
+			if (v == 1.) nPos++;
+			else nNeg++;
+		}
+
+		double auc = .0;
+		size_t truePos = 0, falsePos = 0;
+		for (const auto &p : d) {
+			if (p.second == 1.) truePos++;
+			else {
+				falsePos++;
+				auc += double(truePos);
+			}
+		}
+
+		return auc / (nPos * nNeg);
+	}
+
 	Data::DataColumn & operator-=(Data::DataColumn & a, const Data::DataColumn & b) {
 		if (a.size() != b.size()) throw invalid_argument("length not matched");
 		for (size_t i = 0; i < a.size(); i++) a[i] -= b[i];

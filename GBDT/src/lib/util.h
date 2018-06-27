@@ -24,6 +24,7 @@ namespace zyuco {
 
 	long long getCurrentMillisecond();
 	double calculateAccuracy(const Data::DataColumn &predict, const Data::DataColumn &truth);
+	double calculateAUC(const Data::DataColumn &predict, const Data::DataColumn &truth);
 	Data::DataColumn& operator-=(Data::DataColumn &a, const Data::DataColumn &b);
 	Data::DataColumn& operator+=(Data::DataColumn &a, const Data::DataColumn &b);
 	Data::DataColumn& operator*=(Data::DataColumn &a, double val);
