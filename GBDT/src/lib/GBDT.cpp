@@ -69,9 +69,11 @@ namespace zyuco {
 			}
 		}
 
-		cout << "best gain: " << bestGain << endl;
-		cout << "split at: " << bestSplit << endl;
-		cout << "on feature " << bestFeature << endl << endl;
+		if (bestGain > 0.) {
+			cout << "best gain: " << bestGain << endl;
+			cout << "split at: " << bestSplit << endl;
+			cout << "on feature " << bestFeature << endl << endl;
+		}
 
 		return { bestFeature,bestSplit,bestGain };
 	}
@@ -136,5 +138,32 @@ namespace zyuco {
 		vector<size_t> index(y.size());
 		for (size_t i = 0; i < y.size(); i++) index[i] = i;
 		return createNode(x, y, index, maxDepth);
+	}
+
+	Data::DataColumn GradientBoostingClassifer::predict(const Data::DataFrame & x) const {
+		Data::DataColumn result(x.size(), 0.);
+		for (const auto& ptr : trees) {
+			auto subResult = ptr->predict(x);
+			result += subResult; // better cache performance ?
+		}
+		return result;
+	}
+
+	std::unique_ptr<GradientBoostingClassifer> GradientBoostingClassifer::fit(const Data::DataFrame & x, const Data::DataColumn & y, size_t maxDepth, size_t iters) {
+		auto p = new GradientBoostingClassifer();
+
+		double eta = 1.;
+		auto residual = y;
+		while (iters--) {
+			auto subtree = RegressionTree::fit(x, residual, maxDepth);
+
+			auto pred = subtree->predict(x);
+			pred *= eta;
+			residual -= pred;
+
+			p->trees.push_back(move(subtree));
+		}
+
+		return unique_ptr<GradientBoostingClassifer>(p);
 	}
 }

@@ -91,12 +91,29 @@ namespace zyuco {
 	}
 
 	double calculateAccuracy(const Data::DataColumn & predict, const Data::DataColumn & truth) {
-		if (predict.size() != truth.size()) throw invalid_argument("different size");
+		if (predict.size() != truth.size()) throw invalid_argument("size not matched");
 		int correct = 0;
 		for (size_t i = 0; i < predict.size(); i++) {
 			if (predict[i] <= .5 && truth[i] == 0.) correct++;
 			if (predict[i] > .5 && truth[i] == 1.) correct++;
 		}
 		return double(correct) / predict.size();
+	}
+
+	Data::DataColumn & operator-=(Data::DataColumn & a, const Data::DataColumn & b) {
+		if (a.size() != b.size()) throw invalid_argument("length not matched");
+		for (size_t i = 0; i < a.size(); i++) a[i] -= b[i];
+		return a;
+	}
+
+	Data::DataColumn & operator+=(Data::DataColumn & a, const Data::DataColumn & b) {
+		if (a.size() != b.size()) throw invalid_argument("length not matched");
+		for (size_t i = 0; i < a.size(); i++) a[i] += b[i];
+		return a;
+	}
+
+	Data::DataColumn & operator*=(Data::DataColumn & a, double val) {
+		for (auto &v : a) v *= val;
+		return a;
 	}
 }

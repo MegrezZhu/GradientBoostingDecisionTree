@@ -7,8 +7,23 @@
 #include "util.h"
 
 namespace zyuco {
+	class RegressionTree;
+
 	class GradientBoostingClassifer {
-		
+        struct Config {
+            double eta;
+			size_t maxDepth;
+			// below are not supported yet
+			double minChildWeight;
+			double minimumGain;
+        };
+
+		std::vector<std::unique_ptr<RegressionTree>> trees;
+
+	public:
+		Data::DataColumn predict(const Data::DataFrame &x) const;
+
+		static std::unique_ptr<GradientBoostingClassifer> fit(const Data::DataFrame &x, const Data::DataColumn &y, size_t maxDepth, size_t iters);
 	};
 
 	class RegressionTree {
