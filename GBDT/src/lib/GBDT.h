@@ -54,6 +54,7 @@ namespace zyuco {
 
 		// s: #random-samples, q: #bins
 		static std::vector<double> sampleBinsDivider(const std::vector<double> &v, size_t s, size_t q);
+		static std::vector<double> sampleBinsDivider(const std::vector<double> &v, const Index &index, size_t s, size_t q);
 		static size_t decideWhichBin(const std::vector<double> &divider, double value);
 	public:
 		Data::DataColumn predict(const Data::DataFrame &x) const;

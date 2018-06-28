@@ -23,21 +23,16 @@ namespace zyuco {
 		size_t bestFeature = 0;
 		size_t num = index.size();
 
-		// TODO: parallel
 		#pragma omp parallel for
 		for (int i = 0; i < xx.size(); i++) {
 			size_t featureIndex = i;
 
-			vector<double> featureValues(num);
-			for (size_t i = 0; i < index.size(); i++) {
-				featureValues[i] = xx[featureIndex][index[i]]; // for cache
-			}
-			size_t nSample = pow(num, .5), nBin = pow(num, .25);
-			auto dividers = sampleBinsDivider(featureValues, nSample, nBin);
+			size_t nSample = size_t(pow(num, .5)), nBin = size_t(pow(num, .25));
+			auto dividers = sampleBinsDivider(xx[featureIndex], index, nSample, nBin);
 			vector<double> binSums(nBin, .0), binPowSums(nBin, .0);
 			vector<size_t> binSizes(nBin, 0);
-			for (size_t i = 0; i < num; i++) {
-				auto into = decideWhichBin(dividers, featureValues[i]);
+			for (int i = 0; i < num; i++) {
+				auto into = decideWhichBin(dividers, xx[featureIndex][index[i]]);
 				auto label = y[index[i]];
 				binSums[into] += label;
 				binPowSums[into] += pow(label, 2);
@@ -141,8 +136,25 @@ namespace zyuco {
 		vector<double> samples(s);
 		std::random_device rd;
 		auto gen = std::default_random_engine(rd());
-		std::uniform_int_distribution<int> dis(0, v.size() - 1);
+		std::uniform_int_distribution<size_t> dis(0, v.size() - 1);
 		for (size_t i = 0; i < s; i++) samples[i] = v[dis(gen)];
+
+		sort(samples.begin(), samples.end());
+
+		vector<double> divider(q - 1);
+		size_t space = (samples.size() - (q - 1)) / q;
+		for (size_t i = 0; i < q - 1; i++) {
+			divider[i] = samples[(space + 1) * i];
+		}
+		return divider;
+	}
+
+	std::vector<double> RegressionTree::sampleBinsDivider(const std::vector<double>& v, const Index & index, size_t s, size_t q) {
+		vector<double> samples(s);
+		std::random_device rd;
+		auto gen = std::default_random_engine(rd());
+		std::uniform_int_distribution<size_t> dis(0, index.size() - 1);
+		for (size_t i = 0; i < s; i++) samples[i] = v[index[dis(gen)]];
 
 		sort(samples.begin(), samples.end());
 

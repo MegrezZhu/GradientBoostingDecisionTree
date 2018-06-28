@@ -65,7 +65,7 @@ namespace zyuco {
 			x.clear();
 			y.clear();
 
-			return { { trainX, trainY }, { testX, testY } };
+			return { { move(trainX), move(trainY) }, { move(testX), move(testY) } };
 		}
 
 		std::pair<DataRow, double> parseLibSVMLine(const std::string & line, int featureCount) {
