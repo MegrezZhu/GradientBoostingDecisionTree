@@ -18,14 +18,14 @@ namespace zyuco {
 		else return right->predict(r);
 	}
 
-	RegressionTree::SplitPoint RegressionTree::findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index) {
+	RegressionTree::SplitPoint RegressionTree::findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const Index &featureIndexes) {
 		double bestGain = 0, bestSplit = 0;
 		size_t bestFeature = 0;
 		size_t num = index.size();
 
 		#pragma omp parallel for
-		for (int i = 0; i < xx.size(); i++) {
-			size_t featureIndex = i;
+		for (int i = 0; i < featureIndexes.size(); i++) {
+			size_t featureIndex = featureIndexes[i];
 
 			size_t nSample = size_t(pow(num, .5)), nBin = size_t(pow(num, .25));
 			auto dividers = sampleBinsDivider(xx[featureIndex], index, nSample, nBin);
@@ -88,7 +88,7 @@ namespace zyuco {
 		return a + b - c;
 	}
 
-	std::unique_ptr<RegressionTree> RegressionTree::createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const BoostingConfig &config, size_t leftDepth) {
+	std::unique_ptr<RegressionTree> RegressionTree::createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const Index &featureIndexes, const BoostingConfig &config, size_t leftDepth) {
 		// depth-first growing
 
 		if (leftDepth <= 0) return unique_ptr<RegressionTree>();
@@ -102,7 +102,7 @@ namespace zyuco {
 
 		if (index.size() > max<size_t>(1, config.minChildWeight)) {
 			// try to split
-			auto ret = findSplitPoint(xx, y, index);
+			auto ret = findSplitPoint(xx, y, index, featureIndexes);
 			if (ret.gain > config.gamma && leftDepth > 1) { // check splitablity
 				// split points
 				vector<size_t> leftIndex, rightIndex;
@@ -121,32 +121,15 @@ namespace zyuco {
 					p->featureIndex = ret.featureIndex;
 					p->featureValue = ret.splitPoint;
 
-					p->left = createNode(xx, y, leftIndex, config, leftDepth - 1);
-					p->right = createNode(xx, y, rightIndex, config, leftDepth - 1);
+					p->left = createNode(xx, y, leftIndex, featureIndexes, config, leftDepth - 1);
+					p->right = createNode(xx, y, rightIndex, featureIndexes, config, leftDepth - 1);
 
-					cout << NOW << "node split at feature " << ret.featureIndex << " with gain " << ret.gain << '\n';
+					//cout << NOW << "node split at feature " << ret.featureIndex << " with gain " << ret.gain << '\n';
 				}
 			}
 		}
 
 		return unique_ptr<RegressionTree>(p);
-	}
-
-	std::vector<double> RegressionTree::sampleBinsDivider(const std::vector<double>& v, size_t s, size_t q) {
-		vector<double> samples(s);
-		std::random_device rd;
-		auto gen = std::default_random_engine(rd());
-		std::uniform_int_distribution<size_t> dis(0, v.size() - 1);
-		for (size_t i = 0; i < s; i++) samples[i] = v[dis(gen)];
-
-		sort(samples.begin(), samples.end());
-
-		vector<double> divider(q - 1);
-		size_t space = (samples.size() - (q - 1)) / q;
-		for (size_t i = 0; i < q - 1; i++) {
-			divider[i] = samples[(space + 1) * i];
-		}
-		return divider;
 	}
 
 	std::vector<double> RegressionTree::sampleBinsDivider(const std::vector<double>& v, const Index & index, size_t s, size_t q) {
@@ -199,10 +182,24 @@ namespace zyuco {
 	}
 
 	std::unique_ptr<RegressionTree> RegressionTree::fit(const Data::DataFrame &xx, const Data::DataColumn &y, const BoostingConfig &config) {
-		Index index(xx.front().size());
-		for (size_t i = 0; i < index.size(); i++) index[i] = i;
+		std::random_device rd;
+		auto gen = std::default_random_engine(rd());
 
-		return createNode(xx, y, index, config, config.maxDepth);
+		// generate subsample
+		auto sampleSize = size_t(y.size() * config.subsample);
+		Index index(sampleSize);
+		std::uniform_int_distribution<size_t> dis(0, y.size() - 1);
+		for (size_t i = 0; i < index.size(); i++) index[i] = dis(gen); // sample with replacement
+
+		// generate colsample
+		auto colsampleSize = size_t(xx.size() * config.colsampleByTree);
+		Index featureIndexes(xx.size());
+		for (size_t i = 0; i < featureIndexes.size(); i++) featureIndexes[i] = i;
+		shuffle(featureIndexes.begin(), featureIndexes.end(), mt19937(rd()));
+		featureIndexes.resize(colsampleSize); // sample without replacement
+
+
+		return createNode(xx, y, index, featureIndexes, config, config.maxDepth);
 	}
 
 	Data::DataColumn GradientBoostingClassifer::predict(const Data::DataFrame & x) const {

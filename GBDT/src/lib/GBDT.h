@@ -13,6 +13,8 @@ namespace zyuco {
 		size_t maxDepth = 6;			// max depth allowed
 		size_t minChildWeight = 1;		// minimum allowed size for a node to be splitted
 		size_t rounds = 1;				// number of subtrees
+		double subsample = 1.;			// subsampling ratio for each tree
+		double colsampleByTree = 1.;	// tree-wise feature subsampling ratio
 	};
 
 	class RegressionTree;
@@ -48,12 +50,11 @@ namespace zyuco {
 
 		double predict(const Data::DataRow &r) const;
 
-		static SplitPoint findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index);
+		static SplitPoint findSplitPoint(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const Index &featureIndexes);
 		static double calculateError(size_t len, double sum, double powSum);
-		static std::unique_ptr<RegressionTree> createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const BoostingConfig &config, size_t leftDepth);
+		static std::unique_ptr<RegressionTree> createNode(const Data::DataFrame &xx, const Data::DataColumn &y, const Index &index, const Index &featureIndexes, const BoostingConfig &config, size_t leftDepth);
 
 		// s: #random-samples, q: #bins
-		static std::vector<double> sampleBinsDivider(const std::vector<double> &v, size_t s, size_t q);
 		static std::vector<double> sampleBinsDivider(const std::vector<double> &v, const Index &index, size_t s, size_t q);
 		static size_t decideWhichBin(const std::vector<double> &divider, double value);
 	public:
