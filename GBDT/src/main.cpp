@@ -71,7 +71,7 @@ void printUsage() {
 }
 
 TaskConfig parseConfig(const std::string &str) {
-	const static vector<string> allowedFields = { "eta", "gamma", "maxDepth", "minChildWeight", "rounds", "subSample", "colsampleByTree", "maxThreads", "features", "validateSize" };
+	const static vector<string> allowedFields = { "eta", "gamma", "maxDepth", "minChildWeight", "rounds", "subsample", "colsampleByTree", "maxThreads", "features", "validateSize" };
 	const static vector<string> requiredFileds = { "rounds", "features" };
 
 	map<string, double> configMap;
