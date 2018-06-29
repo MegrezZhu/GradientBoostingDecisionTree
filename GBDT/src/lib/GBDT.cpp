@@ -166,6 +166,7 @@ namespace zyuco {
 		//	}
 		//}
 		//return result;
+
 		for (size_t i = 0; i < divider.size(); i++) {
 			if (value <= divider[i]) return i;
 		}
@@ -177,6 +178,11 @@ namespace zyuco {
 		#pragma omp parallel for
 		for (int i = 0; i < x.size(); i++) {
 			result[i] = predict(x[i]);
+		}
+		// trim outliners
+		for (auto &v : result) {
+			v = max(v, .0);
+			v = min(v, 1.);
 		}
 		return result;
 	}
@@ -198,11 +204,10 @@ namespace zyuco {
 		shuffle(featureIndexes.begin(), featureIndexes.end(), mt19937(rd()));
 		featureIndexes.resize(colsampleSize); // sample without replacement
 
-
 		return createNode(xx, y, index, featureIndexes, config, config.maxDepth);
 	}
 
-	Data::DataColumn GradientBoostingClassifer::predict(const Data::DataFrame & x) const {
+	Data::DataColumn GradientBoostingClassifier::predict(const Data::DataFrame & x) const {
 		Data::DataColumn result(x.size(), 0.);
 		for (const auto& ptr : trees) {
 			auto subResult = ptr->predict(x);
@@ -212,10 +217,11 @@ namespace zyuco {
 		return result;
 	}
 
-	std::unique_ptr<GradientBoostingClassifer> GradientBoostingClassifer::fit(const Data::DataFrame & x, const Data::DataColumn & y, const BoostingConfig &config) {
-		auto p = new GradientBoostingClassifer();
+	std::unique_ptr<GradientBoostingClassifier> GradientBoostingClassifier::fit(const Data::DataFrame &x, const Data::DataColumn &y, const BoostingConfig &config, const Data::DataFrame &tx, const Data::DataColumn &ty) {
+		auto p = new GradientBoostingClassifier();
 
-		if (x.size() != y.size()) throw invalid_argument("x, y has different size");
+		if (x.size() != y.size()) throw invalid_argument("in training data, x y has different length");
+		if (tx.size() != ty.size()) throw invalid_argument("in validation data, x y has different length");
 		if (x.empty() || y.empty()) throw invalid_argument("empty dataset");
 
 		p->config = config;
@@ -229,6 +235,7 @@ namespace zyuco {
 		}
 
 		auto residual = y;
+		Data::DataColumn validationPred(ty.size(), 0.);
 		auto roundsLeft = config.rounds;
 		while (roundsLeft--) {
 			auto subtree = RegressionTree::fit(xx, residual, config);
@@ -237,14 +244,23 @@ namespace zyuco {
 			pred *= config.eta;
 			residual -= pred;
 
-			p->trees.push_back(move(subtree));
 			cout << NOW << config.rounds - roundsLeft << "th round finished\n";
 
 			auto totalPred = y;
 			totalPred -= residual;
 			cout << NOW << "training accuracy: " << calculateAccuracy(totalPred, y) << ", training auc: " << calculateAUC(totalPred, y) << endl;
+
+			// if validation set is non-empty, then
+			if (!tx.empty()) {
+				auto validSubPred = subtree->predict(tx);
+				validSubPred *= config.eta;
+				validationPred += validSubPred;
+				cout << NOW << "validation accuracy: " << calculateAccuracy(validationPred, ty) << ", validation auc: " << calculateAUC(validationPred, ty) << endl;
+			}
+
+			p->trees.push_back(move(subtree));
 		}
 
-		return unique_ptr<GradientBoostingClassifer>(p);
+		return unique_ptr<GradientBoostingClassifier>(p);
 	}
 }

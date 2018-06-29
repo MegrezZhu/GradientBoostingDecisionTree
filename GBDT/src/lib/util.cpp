@@ -14,7 +14,7 @@ using namespace std;
 
 namespace zyuco {
 	namespace Data {
-		TrainData fromLibSVM(const std::string & path, int featureCount) {
+		LibSVMData fromLibSVM(const std::string & path, int featureCount) {
 			DataFrame x;
 			DataColumn y;
 
@@ -37,6 +37,15 @@ namespace zyuco {
 			}
 
 			return { move(x), move(y) };
+		}
+
+		void toCSV(const DataColumn & ids, const DataColumn & pred, const std::string & path) {
+			ofstream out(path);
+			if (!out.is_open()) throw runtime_error("cannot open " + path);
+			out << "id,label" << endl; // header
+			for (size_t i = 0; i < ids.size(); i++) {
+				out << ids[i] << ',' << pred[i] << endl;
+			}
 		}
 
 		SplitXYResult splitXY(DataFrame &&x, DataColumn &&y, double trainSize) {
@@ -76,16 +85,16 @@ namespace zyuco {
 			for (size_t p = 0; p < line.length(); p++) {
 				if (isspace(line[p])) {
 					if (lastp == -1) {
-						sscanf(line.c_str(), "%llu", &label);
+						sscanf(line.c_str(), "%zu", &label);
 					}
 					else {
-						sscanf(line.c_str() + lastp, "%llu:%lf", &index, &value);
+						sscanf(line.c_str() + lastp, "%zu:%lf", &index, &value);
 						values[index] = value;
 					}
-					lastp = p + 1;
+					lastp = int(p + 1);
 				}
 			}
-			return { move(values), label };
+			return { move(values), double(label) };
 		}
 	}
 
@@ -95,6 +104,18 @@ namespace zyuco {
 			chrono::system_clock::now().time_since_epoch()
 			);
 		return ms.count();
+	}
+
+	std::string readFile(const std::string & path) {
+		ifstream file(path);
+		if (file.is_open()) {
+			string content;
+			getline(file, content, '\0');
+			return content;
+		}
+		else {
+			throw runtime_error("cannot open " + path);
+		}
 	}
 
 	double calculateAccuracy(const Data::DataColumn & predict, const Data::DataColumn & truth) {

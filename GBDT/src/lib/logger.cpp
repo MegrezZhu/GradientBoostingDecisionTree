@@ -1,5 +1,3 @@
-#pragma once
-
 #include "logger.h"
 
 using namespace std;
@@ -19,7 +17,7 @@ namespace zyuco {
 
 std::string getTime() {
 	static char buffer[20];
-	auto elapse = duration_cast<milliseconds>(steady_clock::now() - zyuco::startPoint).count();
+	long long elapse = duration_cast<milliseconds>(steady_clock::now() - zyuco::startPoint).count();
 	auto ms = elapse % 1000;
 	auto sec = (elapse / 1000) % 60;
 	auto min = (elapse / (60 * 1000)) % 60;

@@ -19,14 +19,14 @@ namespace zyuco {
 
 	class RegressionTree;
 
-	class GradientBoostingClassifer {
+	class GradientBoostingClassifier {
 		BoostingConfig config;
 		std::vector<std::unique_ptr<RegressionTree>> trees;
 	public:
 
 		Data::DataColumn predict(const Data::DataFrame &x) const;
 
-		static std::unique_ptr<GradientBoostingClassifer> fit(const Data::DataFrame &x, const Data::DataColumn &y, const BoostingConfig &config);
+		static std::unique_ptr<GradientBoostingClassifier> fit(const Data::DataFrame &x, const Data::DataColumn &y, const BoostingConfig &config, const Data::DataFrame &tx = Data::DataFrame(), const Data::DataColumn &ty = Data::DataColumn());
 	};
 
 	class RegressionTree {
