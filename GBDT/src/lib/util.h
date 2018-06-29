@@ -18,7 +18,7 @@ namespace zyuco {
 		};
 
 		LibSVMData fromLibSVM(const std::string &path, int featureCount);
-		void toCSV(const DataColumn &ids, const DataColumn &pred, const std::string &path);
+		void toCSV(const DataColumn &ids, const DataColumn &pred, const std::vector<size_t> &index, const std::string &path);
 		SplitXYResult splitXY(DataFrame &&x, DataColumn &&y, double trainSize = 0.8);
 		std::pair<DataRow, double> parseLibSVMLine(const std::string &line, int featureCount);
 	}

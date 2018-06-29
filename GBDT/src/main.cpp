@@ -148,7 +148,9 @@ std::pair<std::string, std::string> parseConfigItem(const std::string &line) {
 }
 
 void work(const TaskConfig &config) {
+#ifdef _OPENMP
 	omp_set_num_threads(config.maxThreads);
+#endif // _OPENMP
 
 	cout << NOW << "reading..." << endl;
 	auto data = Data::fromLibSVM(config.trainFile, config.features);
@@ -174,7 +176,14 @@ void work(const TaskConfig &config) {
 	auto testData = Data::fromLibSVM(config.testFile, config.features);
 	cout << NOW << "start predicting..." << endl;
 	auto testPred = model->predict(testData.x);
+
+	vector<size_t> index(testData.x.size()); // reorder according to test id
+	for (size_t i = 0; i < index.size(); i++) index[i] = i;
+	sort(index.begin(), index.end(), [&](auto a, auto b) {
+		return testData.y[a] < testData.y[b];
+	});
 	cout << NOW << "done, writing to file..." << endl;
-	Data::toCSV(testData.y, testPred, config.predictFile);
+
+	Data::toCSV(testData.y, testPred, index, config.predictFile);
 	cout << NOW << "all done! prediction results are written into " << config.predictFile << endl;
 }

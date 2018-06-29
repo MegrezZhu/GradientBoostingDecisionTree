@@ -31,7 +31,7 @@ namespace zyuco {
 				auto item = parseLibSVMLine(move(lines[i]), featureCount);
 				#pragma omp critical
 				{
-					x.push_back(item.first);
+					x.push_back(move(item.first));
 					y.push_back(item.second);
 				}
 			}
@@ -39,12 +39,12 @@ namespace zyuco {
 			return { move(x), move(y) };
 		}
 
-		void toCSV(const DataColumn & ids, const DataColumn & pred, const std::string & path) {
+		void toCSV(const DataColumn & ids, const DataColumn & pred, const std::vector<size_t> &index, const std::string & path) {
 			ofstream out(path);
 			if (!out.is_open()) throw runtime_error("cannot open " + path);
 			out << "id,label" << endl; // header
 			for (size_t i = 0; i < ids.size(); i++) {
-				out << ids[i] << ',' << pred[i] << endl;
+				out << ids[index[i]] << ',' << pred[index[i]] << endl;
 			}
 		}
 
@@ -83,13 +83,16 @@ namespace zyuco {
 			double value;
 			int lastp = -1;
 			for (size_t p = 0; p < line.length(); p++) {
-				if (isspace(line[p])) {
+				if (isspace(line[p]) || p == line.length() - 1) {
 					if (lastp == -1) {
 						sscanf(line.c_str(), "%zu", &label);
 					}
 					else {
 						sscanf(line.c_str() + lastp, "%zu:%lf", &index, &value);
-						values[index] = value;
+						if (index > featureCount || index < 1) {
+							throw runtime_error("feature index exceeded given dimension " + to_string(featureCount));
+						}
+						values[index - 1] = value;
 					}
 					lastp = int(p + 1);
 				}
