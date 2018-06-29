@@ -103,7 +103,8 @@ TaskConfig parseConfig(const std::string &str) {
 	TaskConfig config;
 
 	// required fields
-	config.rounds = configMap["rounds"];
+	config.rounds = size_t(configMap["rounds"]);
+	config.features = size_t(configMap["features"]);
 
 	map<string, double>::const_iterator it;
 	// optional fields
@@ -122,7 +123,6 @@ TaskConfig parseConfig(const std::string &str) {
 	get_optional_field(subsample);
 	get_optional_field(colsampleByTree);
 	get_optional_size_t_field(maxThreads);
-	get_optional_size_t_field(features);
 	get_optional_field(validateSize);
 
 #undef get_optional_field
@@ -149,7 +149,7 @@ std::pair<std::string, std::string> parseConfigItem(const std::string &line) {
 
 void work(const TaskConfig &config) {
 #ifdef _OPENMP
-	omp_set_num_threads(config.maxThreads);
+	omp_set_num_threads(int(config.maxThreads));
 #endif // _OPENMP
 
 	cout << NOW << "reading..." << endl;

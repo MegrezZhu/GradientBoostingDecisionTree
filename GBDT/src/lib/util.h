@@ -17,10 +17,10 @@ namespace zyuco {
 			LibSVMData train, test;
 		};
 
-		LibSVMData fromLibSVM(const std::string &path, int featureCount);
+		LibSVMData fromLibSVM(const std::string &path, size_t featureCount);
 		void toCSV(const DataColumn &ids, const DataColumn &pred, const std::vector<size_t> &index, const std::string &path);
 		SplitXYResult splitXY(DataFrame &&x, DataColumn &&y, double trainSize = 0.8);
-		std::pair<DataRow, double> parseLibSVMLine(const std::string &line, int featureCount);
+		std::pair<DataRow, double> parseLibSVMLine(const std::string &line, size_t featureCount);
 	}
 
 	long long getCurrentMillisecond();

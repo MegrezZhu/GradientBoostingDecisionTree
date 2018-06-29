@@ -32,8 +32,9 @@ namespace zyuco {
 			vector<double> binSums(nBin, .0), binPowSums(nBin, .0);
 			vector<size_t> binSizes(nBin, 0);
 			for (int i = 0; i < num; i++) {
-				auto into = decideWhichBin(dividers, xx[featureIndex][index[i]]);
-				auto label = y[index[i]];
+				auto value = xx[featureIndex][index[i]];
+				auto into = decideWhichBin(dividers, value);
+				auto label = y[i];
 				binSums[into] += label;
 				binPowSums[into] += pow(label, 2);
 				binSizes[into]++;
@@ -97,7 +98,7 @@ namespace zyuco {
 
 		// calculate value for prediction
 		p->average = 0.;
-		for (auto ind : index) p->average += y[ind];
+		for (auto v : y) p->average += v;
 		p->average /= index.size();
 
 		if (index.size() > max<size_t>(1, config.minChildWeight)) {
@@ -106,12 +107,16 @@ namespace zyuco {
 			if (ret.gain > config.gamma && leftDepth > 1) { // check splitablity
 				// split points
 				vector<size_t> leftIndex, rightIndex;
-				for (auto ind : index) {
+				Data::DataColumn leftY, rightY;
+				for (size_t i = 0; i < index.size(); i++) {
+					auto ind = index[i];
 					if (xx[ret.featureIndex][ind] <= ret.splitPoint) {
 						leftIndex.push_back(ind); // to the left
+						leftY.push_back(y[i]);
 					}
 					else {
 						rightIndex.push_back(ind); // to the right
+						rightY.push_back(y[i]);
 					}
 				}
 				// if (leftIndex.size() == 0 || rightIndex.size() == 0) throw runtime_error("unexpected empty subtree");
@@ -121,8 +126,8 @@ namespace zyuco {
 					p->featureIndex = ret.featureIndex;
 					p->featureValue = ret.splitPoint;
 
-					p->left = createNode(xx, y, leftIndex, featureIndexes, config, leftDepth - 1);
-					p->right = createNode(xx, y, rightIndex, featureIndexes, config, leftDepth - 1);
+					p->left = createNode(xx, leftY, leftIndex, featureIndexes, config, leftDepth - 1);
+					p->right = createNode(xx, rightY, rightIndex, featureIndexes, config, leftDepth - 1);
 
 					//cout << NOW << "node split at feature " << ret.featureIndex << " with gain " << ret.gain << '\n';
 				}
@@ -194,8 +199,11 @@ namespace zyuco {
 		// generate subsample
 		auto sampleSize = size_t(y.size() * config.subsample);
 		Index index(sampleSize);
+		Data::DataColumn sampledY(sampleSize);
 		std::uniform_int_distribution<size_t> dis(0, y.size() - 1);
 		for (size_t i = 0; i < index.size(); i++) index[i] = dis(gen); // sample with replacement
+		sort(index.begin(), index.end()); // for cache
+		for (size_t i = 0; i < index.size(); i++) sampledY[i] = y[index[i]];
 
 		// generate colsample
 		auto colsampleSize = size_t(xx.size() * config.colsampleByTree);
@@ -203,8 +211,9 @@ namespace zyuco {
 		for (size_t i = 0; i < featureIndexes.size(); i++) featureIndexes[i] = i;
 		shuffle(featureIndexes.begin(), featureIndexes.end(), mt19937(rd()));
 		featureIndexes.resize(colsampleSize); // sample without replacement
+		sort(featureIndexes.begin(), featureIndexes.end()); // for cache
 
-		return createNode(xx, y, index, featureIndexes, config, config.maxDepth);
+		return createNode(xx, sampledY, index, featureIndexes, config, config.maxDepth);
 	}
 
 	Data::DataColumn GradientBoostingClassifier::predict(const Data::DataFrame & x) const {
