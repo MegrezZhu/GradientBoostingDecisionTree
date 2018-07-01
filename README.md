@@ -334,7 +334,7 @@ for (int i = 0; i < num; i++) {
 
 显然在寻找最佳的划分方案时，在不同的特征上寻找最佳划分点的任务是相互独立的，因此可以在特征层面实现并行：
 
-```
+```c++
 #pragma omp parallel for
 for (int i = 0; i < featureIndexes.size(); i++) {
   /*
