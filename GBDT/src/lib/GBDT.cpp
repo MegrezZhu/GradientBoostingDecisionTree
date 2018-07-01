@@ -119,7 +119,6 @@ namespace zyuco {
 						rightY.push_back(y[i]);
 					}
 				}
-				// if (leftIndex.size() == 0 || rightIndex.size() == 0) throw runtime_error("unexpected empty subtree");
 				if (leftIndex.size() != 0 && rightIndex.size() != 0) {
 					p->isLeaf = false;
 
@@ -128,8 +127,6 @@ namespace zyuco {
 
 					p->left = createNode(xx, leftY, leftIndex, featureIndexes, config, leftDepth - 1);
 					p->right = createNode(xx, rightY, rightIndex, featureIndexes, config, leftDepth - 1);
-
-					//cout << NOW << "node split at feature " << ret.featureIndex << " with gain " << ret.gain << '\n';
 				}
 			}
 		}
@@ -155,27 +152,10 @@ namespace zyuco {
 	}
 
 	size_t RegressionTree::decideWhichBin(const std::vector<double>& divider, double value) {
-		// linear search significantly outperforms binary search, why?
-		// due to the mostly zeros?
-
-		//int l = 0, r = divider.size() - 1;
-		//size_t result = r + 1;
-		//while (l <= r) {
-		//	size_t m = (l + r) / 2;
-		//	if (value <= divider[m]) {
-		//		result = m;
-		//		r = m - 1;
-		//	}
-		//	else {
-		//		l = m + 1;
-		//	}
-		//}
-		//return result;
-
-		for (size_t i = 0; i < divider.size(); i++) {
-			if (value <= divider[i]) return i;
-		}
-		return divider.size();
+		if (divider.empty() || value <= divider.front()) return 0;
+		if (value > divider.back()) return divider.size();
+		auto it = lower_bound(divider.cbegin(), divider.cend(), value);
+		return it - divider.cbegin();
 	}
 
 	Data::DataColumn RegressionTree::predict(const Data::DataFrame & x) const {
@@ -183,11 +163,6 @@ namespace zyuco {
 		#pragma omp parallel for
 		for (int i = 0; i < x.size(); i++) {
 			result[i] = predict(x[i]);
-		}
-		// trim outliners
-		for (auto &v : result) {
-			v = max(v, .0);
-			v = min(v, 1.);
 		}
 		return result;
 	}
@@ -223,6 +198,11 @@ namespace zyuco {
 			subResult *= config.eta;
 			result += subResult; // better cache performance ?
 		}
+		// trim outliners
+		for (auto &v : result) {
+			v = max(v, .0);
+			v = min(v, 1.);
+		}
 		return result;
 	}
 
@@ -247,13 +227,14 @@ namespace zyuco {
 		Data::DataColumn validationPred(ty.size(), 0.);
 		auto roundsLeft = config.rounds;
 		while (roundsLeft--) {
+			auto start = getCurrentMillisecond();
 			auto subtree = RegressionTree::fit(xx, residual, config);
 
 			auto pred = subtree->predict(x);
 			pred *= config.eta;
 			residual -= pred;
 
-			cout << NOW << config.rounds - roundsLeft << "th round finished\n";
+			cout << NOW << config.rounds - roundsLeft << "th round finished, used " << getCurrentMillisecond() - start << "ms" << endl;
 
 			auto totalPred = y;
 			totalPred -= residual;

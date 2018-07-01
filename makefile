@@ -1,6 +1,6 @@
 src = GBDT/src
 dist_dir = dist
-obj_dir = $(dist_dir)/obj
+obj_dir = $(dist_dir)/object
 objects = $(obj_dir)/main.o $(obj_dir)/logger.o $(obj_dir)/util.o $(obj_dir)/GBDT.o
 target = $(dist_dir)/boost
 cc = g++ -std=c++17 -O3 -fopenmp -m64
