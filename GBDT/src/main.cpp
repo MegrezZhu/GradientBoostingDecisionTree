@@ -7,10 +7,10 @@
 #include <omp.h>
 
 #include "lib/util.h"
-#include "lib/GBDT.h"
+#include "lib/gbdt.h"
 #include "lib/logger.h"
 
-struct TaskConfig: zyuco::BoostingConfig {
+struct TaskConfig: zyuco::GradientBoostingClassifier::Config {
 	size_t maxThreads = 1;
 	size_t features;
 	double validateSize = .2;

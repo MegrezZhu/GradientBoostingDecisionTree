@@ -330,3 +330,5 @@ ASALocalRun/
 
 *.diagsession
 *.o
+# target executable
+/boost

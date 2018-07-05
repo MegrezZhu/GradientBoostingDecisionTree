@@ -19,13 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\lib\GBDT.h" />
+    <ClInclude Include="src\lib\gbdt.h" />
     <ClInclude Include="src\lib\logger.h" />
+    <ClInclude Include="src\lib\regression_tree.h" />
     <ClInclude Include="src\lib\util.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\lib\GBDT.cpp" />
+    <ClCompile Include="src\lib\gbdt.cpp" />
     <ClCompile Include="src\lib\logger.cpp" />
+    <ClCompile Include="src\lib\regression_tree.cpp" />
     <ClCompile Include="src\lib\util.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
