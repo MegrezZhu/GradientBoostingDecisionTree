@@ -1,5 +1,7 @@
 # Gradient Boosting Decision Tree
 
+[TOC]
+
 ## 1. 构建与使用
 
 ### 1.1 构建
@@ -45,7 +47,7 @@
 GBDT 的核心可以分成两部分，分别是 Gradient Boosting 和 Decision Tree:
 
 * Decision Tree : GBDT 的基分类器，通过划分输入样本的特征使得落在相同特征的样本拥有大致相同的 label。由于在 GBDT 中需要对若干不同的 Decision Tree 的结果进行综合，因此一般采用的是 Regression Tree （回归树）而不是 Classification Tree （分类树）。
-* Gradient Boosting: 迭代式的集成算法，每一棵决策树的学习目标 y 都是之前所有树的结论和的残差（即梯度方向），也即 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+y_i%3Dy-%5Csum_%7Bj%3D0%7D%5E%7Bi-1%7D%7B%5Chat%7By_j%7D%7D&chf=bg%2Cs%2C00000000) 。
+* Gradient Boosting: 迭代式的集成算法，每一棵决策树的学习目标 y 都是之前所有树的结论和的残差（即梯度方向），也即 $y_i=y-\sum_{j=0}^{i-1}{\hat{y_j}}$ 。
 
 ## 3. 实现与优化历程
 
@@ -190,31 +192,54 @@ if (x.size() > nodeThres) {
 
 问题描述如下：
 
-对于数据集 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+D&chf=bg%2Cs%2C00000000)，我们要找到特征 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+A&chf=bg%2Cs%2C00000000) 以及该特征上的划分点 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q&chf=bg%2Cs%2C00000000)，满足 MSE (mean-square-error 均方误差) 最小：
-![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+%0D%28A%2Cq%29%3D%7B%5Carg%5Cmin%7D_%7BA%2Cq%7DE%28A%2Cq%29%0D&chf=bg%2Cs%2C00000000)
+对于数据集 $D$，我们要找到特征 $A$ 以及该特征上的划分点 $q$，满足 MSE (mean-square-error 均方误差) 最小：
+$$
+(A,q)={\arg\min}_{A,q}E(A,q)
+$$
 
-![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+%0D%0DE%28A%2Cq%29%3DE_%7Bleft%7D%2BE_%7Bright%7D%0D%3D%5Cfrac%7BN_1%7D%7BN_1%2BN_2%7D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_1%28A%2Cq%29%7D%28y_i-c_1%29%5E2%2B%5Cfrac%7BN_2%7D%7BN_1%2BN_2%7D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_2%28A%2Cq%29%7D%28y_i-c_2%29%5E2%0D%0D&chf=bg%2Cs%2C00000000)
+$$
+\begin{equation}\begin{split}
+E(A,q)&=E_{left}+E_{right}\\
+&=\frac{N_1}{N_1+N_2}\sum_{(x_i,y_i)\in D_1(A,q)}(y_i-c_1)^2+\frac{N_2}{N_1+N_2}\sum_{(x_i,y_i)\in D_2(A,q)}(y_i-c_2)^2\\
+\end{split}\end{equation}
+$$
 
 其中：
 
-* ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+c_i%3D%5Cfrac%7B1%7D%7BN_i%7D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_i%28A%2Cq%29%7Dy_i&chf=bg%2Cs%2C00000000)，即划分后的样本 label 均值。
-* ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+N_i%3D%7CD_i%28A%2Cq%29%7C&chf=bg%2Cs%2C00000000)，![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+D_i&chf=bg%2Cs%2C00000000) 为划分后的子数据集。
+* $c_i=\frac{1}{N_i}\sum_{(x_i,y_i)\in D_i(A,q)}y_i$，即划分后的样本 label 均值。
+* $N_i=|D_i(A,q)|$，$D_i$ 为划分后的子数据集。
 
-等价地，如果用 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+G&chf=bg%2Cs%2C00000000) 表示划分收益：
-![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+%0DG%3DE_p-E%28A%2Cq%29%0D&chf=bg%2Cs%2C00000000)
-其中，![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+E_p&chf=bg%2Cs%2C00000000) 为划分前的 MSE: ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+E_p%3D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D%7D%7B%28y_i-c%29%5E2%7D&chf=bg%2Cs%2C00000000)，![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+c%3D%5Cfrac%7B1%7D%7B%7CD%7C%7D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D%7Dy_i&chf=bg%2Cs%2C00000000) 。
+等价地，如果用 $G$ 表示划分收益：
+$$
+G=E_p-E(A,q)
+$$
+其中，$E_p$ 为划分前的 MSE: $E_p=\sum_{(x_i,y_i)\in D}{(y_i-c)^2}$，$c=\frac{1}{|D|}\sum_{(x_i,y_i)\in D}y_i$ 。
 
 寻找最佳划分点等价于寻找收益最高的划分方案：
-![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+%0D%28A%2Cq%29%3D%5Carg%5Cmax%7BA%2Cq%7DG%28A%2Cq%29%3D%5Carg%5Cmin%7BA%2Cq%7DE%28A%2Cq%29%0D&chf=bg%2Cs%2C00000000)
+$$
+(A,q)=\arg\max{A,q}G(A,q)=\arg\min{A,q}E(A,q)
+$$
 
 ##### 3.2.1.1 基于排序的实现
 
 分析：
-![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+%0D%0DE_%7Bleft%7D%28A%2Cq%29%0D%3D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_1%28A%2Cq%29%7D%28y_i-c_1%29%5E2%0D%3D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_1%28A%2Cq%29%7Dy_i%5E2%2BN_1c_1%5E2-2c_1%5E2%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_1%28A%2Cq%29%7Dy_i%0D%0D&chf=bg%2Cs%2C00000000)
+$$
+\begin{equation}\begin{split}
+E_{left}(A,q)
+&=\sum_{(x_i,y_i)\in D_1(A,q)}(y_i-c_1)^2\\
+&=\sum_{(x_i,y_i)\in D_1(A,q)}y_i^2+N_1c_1^2-2c_1^2\sum_{(x_i,y_i)\in D_1(A,q)}y_i
+\end{split}\end{equation}
+$$
 
-![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+%0D%0DE_%7Bright%7D%28A%2Cq%29%0D%3D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_2%28A%2Cq%29%7D%28y_i-c_2%29%5E2%0D%3D%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_2%28A%2Cq%29%7Dy_i%5E2%2BN_2c_2%5E2-2c_2%5E2%5Csum_%7B%28x_i%2Cy_i%29%5Cin+D_2%28A%2Cq%29%7Dy_i%0D%0D&chf=bg%2Cs%2C00000000)
+$$
+\begin{equation}\begin{split}
+E_{right}(A,q)
+&=\sum_{(x_i,y_i)\in D_2(A,q)}(y_i-c_2)^2\\
+&=\sum_{(x_i,y_i)\in D_2(A,q)}y_i^2+N_2c_2^2-2c_2^2\sum_{(x_i,y_i)\in D_2(A,q)}y_i
+\end{split}\end{equation}
+$$
 
-显然，![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+E_%7Bleft%7D&chf=bg%2Cs%2C00000000) 与 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+E_%7Bright%7D&chf=bg%2Cs%2C00000000) 都只与分割点左边（右边）的部分和有关，因此可以先排序、再从小到大枚举分割点计算出所有分割情况的收益，对于每个特征，时间复杂度均为 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+O%28n%5Clog+n%29%2BO%28n%29%3DO%28n%29&chf=bg%2Cs%2C00000000)。
+显然，$E_{left}$ 与 $E_{right}$ 都只与分割点左边（右边）的部分和有关，因此可以先排序、再从小到大枚举分割点计算出所有分割情况的收益，对于每个特征，时间复杂度均为 $O(n\log n)+O(n)=O(n)$。
 
 代码如下：
 
@@ -284,19 +309,19 @@ for (size_t featureIndex = 0; featureIndex < x.front().size(); featureIndex++) {
 
 SS 方法描述如下：
 
-对于 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+N&chf=bg%2Cs%2C00000000) 个乱序的数值，我们先从中随机采样 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+s&chf=bg%2Cs%2C00000000) 个样本，将其排序后再等距采样 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q-1&chf=bg%2Cs%2C00000000) 个样本，以这 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q-1&chf=bg%2Cs%2C00000000) 个样本作为 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q&chf=bg%2Cs%2C00000000) 个桶的分割点。文献中指出，如果 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q+%3C%3C+s&chf=bg%2Cs%2C00000000) ，那么有很高的概率能保证分到 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q&chf=bg%2Cs%2C00000000) 个桶中的样本数量都接近 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+%5Cfrac%7Bn%7D%7Bq%7D&chf=bg%2Cs%2C00000000) ，也就是接近等分。
+对于 $N$ 个乱序的数值，我们先从中随机采样 $s$ 个样本，将其排序后再等距采样 $q-1$ 个样本，以这 $q-1$ 个样本作为 $q$ 个桶的分割点。文献中指出，如果 $q << s$ ，那么有很高的概率能保证分到 $q$ 个桶中的样本数量都接近 $\frac{n}{q}$ ，也就是接近等分。
 
-采用这种方法，只需要 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+O%28N%29&chf=bg%2Cs%2C00000000) 的时间采样出 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q&chf=bg%2Cs%2C00000000) 个桶、![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+O%28N%5Clog+q%29&chf=bg%2Cs%2C00000000) 的时间来将所有样本分配到不同的桶中。
+采用这种方法，只需要 $O(N)$ 的时间采样出 $q$ 个桶、$O(N\log q)$ 的时间来将所有样本分配到不同的桶中。
 
-在划分桶之后，我们只选择桶的分割点作为节点分割点的候选，因此只需要对代码稍作改动即可在 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+O%28q%29&chf=bg%2Cs%2C00000000) 的时间内找到最佳的分割点。因此对于每个特征，寻找最佳分割点的时间复杂度为 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+O%28N%5Clog+q%29&chf=bg%2Cs%2C00000000)。
+在划分桶之后，我们只选择桶的分割点作为节点分割点的候选，因此只需要对代码稍作改动即可在 $O(q)$ 的时间内找到最佳的分割点。因此对于每个特征，寻找最佳分割点的时间复杂度为 $O(N\log q)$。
 
 使用这种方法，虽然因为只考虑了以分桶边界的值进行分割的情况，不一定能找到最佳的分割，但因为 Boosting 方法其本质便是将许多“次优”决策树进行结合，因此 SS 方法造成的损失是可以接受的。
 
 [^1]: Ranka, Sanjay, and V. Singh. “CLOUDS: A decision tree classifier for large datasets.” Proceedings of the 4th Knowledge Discovery and Data Mining Conference. 1998.
 
-代码如下（简单选择 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+s%3D%5Csqrt%7BN%7D&chf=bg%2Cs%2C00000000)， ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q%3D%5Csqrt%7Bs%7D&chf=bg%2Cs%2C00000000) ）：
+代码如下（简单选择 $s=\sqrt{N}$， $q=\sqrt{s}$ ）：
 
-> 虽然这样的 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+s%2C+q&chf=bg%2Cs%2C00000000) 取值事实上会使 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q%3D%5Csqrt%5B4%5DN&chf=bg%2Cs%2C00000000) ，时间复杂度 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+O%28N%5Clog+q%29%3DO%28N%5Clog+N%5E%7B%5Cfrac%7B1%7D%7B4%7D%7D%29%3DO%28N%5Clog+N%29&chf=bg%2Cs%2C00000000)，但在测试数据中 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+N%5Csim10%5E6&chf=bg%2Cs%2C00000000)，![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q%7E%5Csim32&chf=bg%2Cs%2C00000000) 已经足够小。而若 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+N&chf=bg%2Cs%2C00000000) 继续增大，则可以简单将 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+q&chf=bg%2Cs%2C00000000) 设为一个不大于 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+128&chf=bg%2Cs%2C00000000) 的常数，影响不大。
+> 虽然这样的 $s, q$ 取值事实上会使 $q=\sqrt[4]N$ ，时间复杂度 $O(N\log q)=O(N\log N^{\frac{1}{4}})=O(N\log N)$，但在测试数据中 $N\sim10^6$，$q~\sim32$ 已经足够小。而若 $N$ 继续增大，则可以简单将 $q$ 设为一个不大于 $128$ 的常数，影响不大。
 
 ```c++
 /* in findSplitPoint */
@@ -474,7 +499,7 @@ for (size_t i = 0; i < index.size(); i++) {
 
 #### 4.3.1 X重整
 
-对于 LibSVM 格式的输入数据来说，一个很直觉的存储方式是以 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+N+%5Ctimes+dims&chf=bg%2Cs%2C00000000) 的形状存储。但纵观整个算法，在训练过程中对数据的访问都是固定 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+dims&chf=bg%2Cs%2C00000000) 维的连续访问（即对所有样本的某一特征的读取），这样不连续的内存访问会造成 cache 性能的下降。因此在训练之前，我把 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+N%5Ctimes+dims&chf=bg%2Cs%2C00000000) 的数据重整成了以特征优先的 ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+dims%5Ctimes+N&chf=bg%2Cs%2C00000000) 形状，这样在训练过程中就只需要对 `x[featureIndex]` 进行连续读取，对 cache 更友好。
+对于 LibSVM 格式的输入数据来说，一个很直觉的存储方式是以 $N \times dims$ 的形状存储。但纵观整个算法，在训练过程中对数据的访问都是固定 $dims$ 维的连续访问（即对所有样本的某一特征的读取），这样不连续的内存访问会造成 cache 性能的下降。因此在训练之前，我把 $N\times dims$ 的数据重整成了以特征优先的 $dims\times N$ 形状，这样在训练过程中就只需要对 `x[featureIndex]` 进行连续读取，对 cache 更友好。
 
 #### 4.3.2 索引排序
 
@@ -534,7 +559,7 @@ for (size_t i = 0; i < index.size(); i++) {
 >
 > 训练数据：
 >
-> * train: ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+1719691%5Ctimes+201&chf=bg%2Cs%2C00000000)
+> * train: $1719691\times 201$
 > * max-depth: 20
 > * subsample = 95
 > * colsample-by-tree = .93
@@ -549,14 +574,14 @@ for (size_t i = 0; i < index.size(); i++) {
 ### 5.2 内存占用
 
 * 本算法：由于是把数据作为密集矩阵存储，因此对内存的消耗较大。以 672MB 的训练数据为例，因为数据较为稀疏，读入内存处理之后的占用空间膨胀到了 5GB。
-* xgboost：同样的 672MB 训练数据，运行时约消耗 1.4GB。 
+* xgboost：同样的 672MB 训练数据，运行时约消耗 1.4GB。
 
 ### 5.3 预测准确性
 
 由于本算法使用了 SS 方法，因此相同轮数下的预测准确率应该低于 xgboost，简单测试如下：
 
-* 本算法： ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+AUC%3D.88256&chf=bg%2Cs%2C00000000)
-* xgboost： ![](https://chart.googleapis.com/chart?cht=tx&chl=%5CLarge+AUC%3D.90335&chf=bg%2Cs%2C00000000)
+* 本算法： $AUC=.88256$
+* xgboost： $AUC=.90335$
 
 > 简单测试的意思是测试时并没有对提供给本算法的训练参数进行调优，使用的是如下配置：
 >
@@ -579,4 +604,3 @@ for (size_t i = 0; i < index.size(); i++) {
 > > subsample = 0.9500
 > >
 > > colsampleByTree = 0.9287
-
