@@ -190,33 +190,51 @@ if (x.size() > nodeThres) {
 
 问题描述如下：
 
-对于数据集 $D$，我们要找到特征 $A$ 以及该特征上的划分点 $q$，满足：
+对于数据集 $D$，我们要找到特征 $A$ 以及该特征上的划分点 $q$，满足 MSE (mean-square-error 均方误差) 最小：
 $$
 (A,q)={\arg\min}_{A,q}E(A,q)
 $$
 
 $$
-E(A,q)=\sum_{(x_i,y_i)\in D_1(A,q)}(y_i-c_1)^2+\sum_{(x_i,y_i)\in D_1(A,q)}(y_i-c2)^2
+\begin{equation}\begin{split}
+E(A,q)&=E_{left}+E_{right}\\
+&=\frac{N_1}{N_1+N_2}\sum_{(x_i,y_i)\in D_1(A,q)}(y_i-c_1)^2+\frac{N_2}{N_1+N_2}\sum_{(x_i,y_i)\in D_2(A,q)}(y_i-c_2)^2\\
+\end{split}\end{equation}
 $$
 
 其中：
 
 * $c_i=\frac{1}{N_i}\sum_{(x_i,y_i)\in D_i(A,q)}y_i$，即划分后的样本 label 均值。
-* $N_i=|D_i(A,q)|$
+* $N_i=|D_i(A,q)|$，$D_i$ 为划分后的子数据集。
+
+等价地，如果用 $G$ 表示划分收益：
+$$
+G=E_p-E(A,q)
+$$
+其中，$E_p$ 为划分前的 MSE: $E_p=\sum_{(x_i,y_i)\in D}{(y_i-c)^2}$，$c=\frac{1}{|D|}\sum_{(x_i,y_i)\in D}y_i$ 。
+
+寻找最佳划分点等价于寻找收益最高的划分方案：
+$$
+(A,q)=\arg\max{A,q}G(A,q)=\arg\min{A,q}E(A,q)
+$$
 
 ##### 3.2.1.1 基于排序的实现
 
 分析：
 $$
+\begin{equation}\begin{split}
 E_{left}(A,q)
-=\sum_{(x_i,y_i)\in D_1(A,q)}(y_i-c_1)^2
-=\sum_{(x_i,y_i)\in D_1(A,q)}y_i^2+N_1c_1^2-2c_1^2\sum_{(x_i,y_i)\in D_1(A,q)}y_i
+&=\sum_{(x_i,y_i)\in D_1(A,q)}(y_i-c_1)^2\\
+&=\sum_{(x_i,y_i)\in D_1(A,q)}y_i^2+N_1c_1^2-2c_1^2\sum_{(x_i,y_i)\in D_1(A,q)}y_i
+\end{split}\end{equation}
 $$
 
 $$
+\begin{equation}\begin{split}
 E_{right}(A,q)
-=\sum_{(x_i,y_i)\in D_2(A,q)}(y_i-c_2)^2
-=\sum_{(x_i,y_i)\in D_2(A,q)}y_i^2+N_2c_2^2-2c_2^2\sum_{(x_i,y_i)\in D_2(A,q)}y_i
+&=\sum_{(x_i,y_i)\in D_2(A,q)}(y_i-c_2)^2\\
+&=\sum_{(x_i,y_i)\in D_2(A,q)}y_i^2+N_2c_2^2-2c_2^2\sum_{(x_i,y_i)\in D_2(A,q)}y_i
+\end{split}\end{equation}
 $$
 
 显然，$E_{left}$ 与 $E_{right}$ 都只与分割点左边（右边）的部分和有关，因此可以先排序、再从小到大枚举分割点计算出所有分割情况的收益，对于每个特征，时间复杂度均为 $O(n\log n)+O(n)=O(n)$。
@@ -300,6 +318,8 @@ SS 方法描述如下：
 [^1]: Ranka, Sanjay, and V. Singh. “CLOUDS: A decision tree classifier for large datasets.” Proceedings of the 4th Knowledge Discovery and Data Mining Conference. 1998.
 
 代码如下（简单选择 $s=\sqrt{N}$， $q=\sqrt{s}$ ）：
+
+> 虽然这样的 $s, q$ 取值事实上会使 $q=\sqrt[4]N$ ，时间复杂度 $O(N\log q)=O(N\log N^{\frac{1}{4}})=O(N\log N)$，但在测试数据中 $N\sim10^6$，$q~\sim32$ 已经足够小。而若 $N$ 继续增大，则可以简单将 $q$ 设为一个不大于 $128$ 的常数，影响不大。
 
 ```c++
 /* in findSplitPoint */
@@ -523,7 +543,7 @@ for (size_t i = 0; i < index.size(); i++) {
 }
 ```
 
-## 5. 测试
+## 5. 测试对比
 
 ### 5.1 性能
 
@@ -549,7 +569,12 @@ for (size_t i = 0; i < index.size(); i++) {
   * 数据读取：约需 4s
   * 训练：每轮平均耗时 40s
 
-### 5.2 预测准确性
+### 5.2 内存占用
+
+* 本算法：由于是把数据作为密集矩阵存储，因此对内存的消耗较大。以 672MB 的训练数据为例，因为数据较为稀疏，读入内存处理之后的占用空间膨胀到了 5GB。
+* xgboost：同样的 672MB 训练数据，运行时约消耗 1.4GB。 
+
+### 5.3 预测准确性
 
 由于本算法使用了 SS 方法，因此相同轮数下的预测准确率应该低于 xgboost，简单测试如下：
 
