@@ -34,7 +34,6 @@ content = re.sub(
     '=',
     content
 )
-
 content = re.sub(
     r'\$\$(.+?)\$\$',
     formula_to_img,
